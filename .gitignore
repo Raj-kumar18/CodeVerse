@@ -1,0 +1,42 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log
+pnpm-debug.log
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Logs
+logs/
+*.log
+logs/*.log
+logs/**/*.log
+
+# Build artifacts
+dist/
+build/
+.cache/
+.vscode/
+.DS_Store
+*.swp
+
+# Temporary files
+tmp/
+out/
+coverage/
+*.pid
+*.seed
+*.lock
+*.orig
+
+# Editor-specific
+.idea/
+.vscode/
+*.sublime-workspace
+
+# OS-specific
+Thumbs.db
+.DS_Store
