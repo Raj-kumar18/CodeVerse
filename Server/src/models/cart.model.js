@@ -8,7 +8,8 @@ const cartSchema = new Schema(
                 book: { type: Schema.Types.ObjectId, ref: "Book", required: true }, // ✅ Book ID
                 quantity: { type: Number, required: true, min: 1 }, // ✅ Individual Quantity
             }
-        ]
+        ],
+        coupon: { type: Schema.Types.ObjectId, ref: "Coupon", default: null }, // ✅ Applied Coupon
     },
     { timestamps: true }
 );
