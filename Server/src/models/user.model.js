@@ -33,7 +33,6 @@ const userSchema = new Schema(
     },
     address: {
       type: String,
-      required: true,
       trim: true,
     },
     phone: {
@@ -68,6 +67,10 @@ userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
 });
+
+userSchema.methods.isPasswordCorrect = async function (password) {
+  return await bcrypt.compare(password, this.password);
+}
 
 // ✅ **2️⃣ OTP Generate karne ka method**
 userSchema.methods.generateOTP = function () {
