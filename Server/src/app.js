@@ -19,9 +19,11 @@ app.use(cookieParser())
 // Routes
 import authRoutes from "./routes/auth.routes.js";
 import categoryRoutes from "./routes/category.routes.js";
+import bookRoutes from "./routes/book.routes.js";
 
 app.use("/api/v1/users", authRoutes);
 app.use("/api/v1/categories", categoryRoutes);
+app.use("/api/v1/books", bookRoutes);
 
 
 export { app };
