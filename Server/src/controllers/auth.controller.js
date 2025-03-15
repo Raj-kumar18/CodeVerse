@@ -108,6 +108,31 @@ const verifyOTP = asyncHandler(async (req, res) => {
     return res.json(new ApiResponse(200, null, "OTP verified successfully, account activated"));
 });
 
+const resendOTP = asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    if (user.isVerified) {
+        return res.status(400).json(new ApiResponse(400, null, "User already verified"));
+    }
+
+    // Generate OTP
+    user.generateOTP();
+    await user.save(); // ✅ Save the updated user
+
+    // Send OTP Email
+    await sendEmail(user.email, "Verify your account", `Your OTP is: ${user.otp}. It will expire in 5 minutes.`);
+
+    return res.json(new ApiResponse(200, null, "OTP resent successfully"));
+});
+
+
+
 const loginUser = asyncHandler(async (req, res) => {
     const { email, userName, password } = req.body;
 
@@ -156,5 +181,124 @@ const loginUser = asyncHandler(async (req, res) => {
         );
 });
 
+const logoutUser = asyncHandler(async (req, res) => {
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $unset: { refreshToken: 1 } // ✅ Remove refreshToken
+        },
+        { new: true }
+    )
 
-export { registerUser, verifyOTP, loginUser }
+    const options = {
+        httpOnly: true,
+        secure: true
+    };
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged out successfully"));
+});
+
+const refreshAccessToken = asyncHandler(async (req, res) => {
+    const incomingRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+
+    if (!incomingRefreshToken) {
+        throw new ApiError(401, "Unauthorized");
+    }
+
+    try {
+        const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+
+        const user = await User.findById(decodedToken._id);
+
+        if (!user) {
+            throw new ApiError(401, "Invalid refresh token");
+        }
+
+        if (incomingRefreshToken !== user.refreshToken) {
+            throw new ApiError(401, "Invalid refresh token");
+        }
+        const options = {
+            httpOnly: true,
+            secure: true
+        }
+
+        const { accessToken, newRefreshToken } = await generateAccessAndRefreshToken(user._id);
+
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", newRefreshToken, options)
+            .json(
+                new ApiResponse(
+                    200,
+                    { accessToken, refreshToken: newRefreshToken },
+                    "Access token refreshed successfully"
+                )
+            )
+
+    } catch (error) {
+        throw new ApiError(401, "Invalid refresh token");
+    }
+})
+
+
+const updateProfile = asyncHandler(async (req, res) => {
+    const allowedFields = ["userName", "email", "phone", "address"]; // Allowed fields list
+    const updateData = {};
+
+    // Filter only fields provided in req.body
+    Object.keys(req.body).forEach((key) => {
+        if (allowedFields.includes(key) && req.body[key] !== undefined && req.body[key] !== "") {
+            updateData[key] = req.body[key];
+        }
+    });
+
+    // If no valid field is provided, return an error
+    if (Object.keys(updateData).length === 0) {
+        throw new ApiError(400, "At least one field is required to update");
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+        req.user._id,
+        { $set: updateData },
+        { new: true, runValidators: true }
+    ).select("-password -refreshToken");
+
+    if (!updatedUser) {
+        throw new ApiError(404, "User not found");
+    }
+
+    return res.json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+});
+
+
+const changePassword = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+        throw new ApiError(400, "Please provide oldPassword and newPassword");
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid old password");
+    }
+
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    return res.json(new ApiResponse(200, {}, "Password changed successfully"));
+})
+
+export { registerUser, verifyOTP, loginUser, resendOTP, logoutUser, refreshAccessToken, updateProfile, changePassword };
